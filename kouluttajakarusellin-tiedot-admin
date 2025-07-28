@@ -1,0 +1,132 @@
+/**
+ * Päivittää koulutusjärjestäjien logot ja linkit ACF-kenttiin (Etusivu & Ota yhteyttä).
+ * Lisää adminin sivueditori-näkymään metabox, jolla päivitys voidaan suorittaa manuaalisesti.
+ */
+
+/**
+ * Päivittää kouluttajakuvakarusellin gallerian ja linkit annetulle sivulle.
+ *
+ * @param int    $post_id            Sivun ID, johon kentät päivitetään.
+ * @param string $gallery_field_name Gallerian kentän nimi, oletuksena 'kouluttajakuvakaruselli'.
+ */
+function paivita_kouluttajakuvakaruselli($post_id, $gallery_field_name = 'kouluttajakuvakaruselli') {
+    // Hae kaikki julkaistut koulutusjärjestäjät, joilla on logo meta-avain
+    $kouluttajat = get_posts([
+        'post_type'      => 'koulutusjarjestaja',
+        'post_status'    => 'publish',
+        'posts_per_page' => -1,
+        'meta_query'     => [
+            [
+                'key'     => 'logo',
+                'compare' => 'EXISTS',
+            ],
+        ],
+        'fields'         => 'ids', // Haetaan vain ID:t tehokkuuden lisäämiseksi
+        'no_found_rows'  => true,
+        'cache_results'  => false,
+    ]);
+
+    $logos = [];     // Tallennetaan kaikkien logojen liitos ID:t galleriaan
+    $link_map = [];  // Logon ID => linkki kouluttajan sivulle
+
+    foreach ($kouluttajat as $kouluttaja_id) {
+        $logo = get_field('logo', $kouluttaja_id);
+
+        // Selvitetään logon ID kentän muodosta
+        if (is_array($logo) && !empty($logo['ID'])) {
+            $logo_id = intval($logo['ID']);
+        } elseif (is_numeric($logo)) {
+            $logo_id = (int) $logo;
+        } else {
+            continue; // Ohitetaan, jos logo ei ole kelvollinen
+        }
+
+        // Lisätään logon ID galleriaan ja tallennetaan linkki kouluttajan sivulle
+        $logos[] = $logo_id;
+        $link_map[$logo_id] = esc_url(get_permalink($kouluttaja_id));
+    }
+
+    // Päivitä gallerian kuvien ID:t ACF-kenttään annetulle sivulle
+    update_field($gallery_field_name, $logos, $post_id);
+
+    // Päivitä rinnakkainen kenttä linkkitaulukolla JSON-muodossa samaan sivuun
+    update_field('kouluttajakuvakaruselli_linkit', wp_json_encode($link_map), $post_id);
+}
+
+/**
+ * Automatisoi karusellin päivitys, kun Etusivu (ID 14) tai Ota yhteyttä (ID 22) tallennetaan.
+ */
+add_action('acf/save_post', function($post_id) {
+    $handled_page_ids = [14, 22];
+
+    if ( ! in_array((int)$post_id, $handled_page_ids, true) ) {
+        return;
+    }
+
+    paivita_kouluttajakuvakaruselli($post_id);
+}, 20);
+
+/**
+ * Lisää metabox päivityspainikkeelle sivujen (ID 14 ja 22) editointinäkymään.
+ */
+add_action('add_meta_boxes', function() {
+    $screen = 'page';
+
+    add_meta_box(
+        'karuselli_paivitys',
+        __('Päivitä kouluttajakuvakaruselli', 'text-domain'),
+        'paivita_karuselli_metabox_callback',
+        $screen,
+        'side',
+        'high'
+    );
+});
+
+/**
+ * Metaboxin sisältö: lomake, joka sisältää napin manuaaliseen päivitykseen.
+ *
+ * @param WP_Post $post Tämän hetken editattava postaus.
+ */
+function paivita_karuselli_metabox_callback($post) {
+    // Näytetään vain sivuilla, joilla ID 14 tai 22
+    if ( ! in_array($post->ID, [14, 22], true) ) {
+        return;
+    }
+
+    ?>
+    <form method="post">
+        <?php wp_nonce_field('paivita_karuselli_metabox', 'paivita_karuselli_nonce'); ?>
+        <input type="hidden" name="paivita_karuselli_postid" value="<?php echo esc_attr($post->ID); ?>">
+        <input type="submit" name="paivita_karuselli_action" class="button button-primary" value="<?php esc_attr_e('Päivitä kouluttajakuvakaruselli', 'text-domain'); ?>">
+        <p style="margin-top:8px; font-size:12px; color:#555;">
+            <?php esc_html_e('Päivittää automaattisesti kaikki koulutusjärjestäjien logot ja linkit karuselliin.', 'text-domain'); ?>
+        </p>
+    </form>
+    <?php
+}
+
+/**
+ * Käsittelee metaboxin lomakkeen lähetyksen ja suorittaa päivityksen.
+ * Näyttää onnistumisilmoituksen admin-alueella.
+ */
+add_action('admin_init', function() {
+    if (
+        isset($_POST['paivita_karuselli_action'], $_POST['paivita_karuselli_nonce'], $_POST['paivita_karuselli_postid'])
+        && wp_verify_nonce($_POST['paivita_karuselli_nonce'], 'paivita_karuselli_metabox')
+    ) {
+        $post_id = intval($_POST['paivita_karuselli_postid']);
+
+        // Varmistetaan, että käyttäjällä on oikeus tallentaa kyseinen sivu
+        if (current_user_can('edit_post', $post_id)) {
+            paivita_kouluttajakuvakaruselli($post_id);
+
+            add_action('admin_notices', function() {
+                ?>
+                <div class="notice notice-success is-dismissible">
+                    <p><?php esc_html_e('Kouluttajakuvakaruselli päivitetty onnistuneesti.', 'text-domain'); ?></p>
+                </div>
+                <?php
+            });
+        }
+    }
+});
