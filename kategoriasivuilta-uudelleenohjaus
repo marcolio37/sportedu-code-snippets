@@ -1,0 +1,8 @@
+add_action('template_redirect', function() {
+    // Tarkistetaan onko kyse kategoria-, tagi- tai muu taksonomiasivu
+    if (is_category() || is_tag() || is_tax()) {
+        // Ohjataan käyttäjä kotisivulle nopealla 301-uudelleenohjauksella
+        wp_redirect(home_url(), 301);
+        exit;
+    }
+});
