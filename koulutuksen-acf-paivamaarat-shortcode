@@ -1,0 +1,43 @@
+/**
+ * Shortcode [koulutus_acf_paivamaarat]
+ * Näyttää koulutuksen päivämäärät: alkamispäivä, päättymispäivä ja ilmoittautumisen päättymispäivä.
+ * Ilmoittautumisen päättymispäivässä erikoistapaus: jos arvo puuttuu, näytetään "Jatkuva ilmoittautuminen".
+ *
+ * @return string HTML-muotoinen esitys päivämääristä.
+ */
+add_shortcode('koulutus_acf_paivamaarat', function() {
+    $post_id = get_the_ID();
+
+    // Määrittele haettavat kentät ja niiden näkyvä nimi
+    $fields = [
+        'koulutuksen_alkamispaiva'         => 'Alkamispäivä',
+        'koulutuksen_paattymispaiva'       => 'Päättymispäivä',
+        'ilmoittautumisen_paattymispaiva'  => 'Ilmoittautumisen päättymispäivä',
+    ];
+
+    $output = '';
+
+    foreach ($fields as $field_key => $field_label) {
+        $value = get_field($field_key, $post_id);
+
+        // Tarkista onko kentällä arvo (esim. "0" hyväksytään arvoksi)
+        $has_value = isset($value) && strlen(trim((string)$value)) > 0;
+
+        // Näytetään kenttä, jos sillä on arvo tai kyseessä on ilmoittautumisen päättymispäivä (jossa tyhjäkin esitetään)
+        if ($has_value || $field_key === 'ilmoittautumisen_paattymispaiva') {
+            $output .= '<section class="acf-info-ryhma">';
+            $output .= '<h3 class="acf-info-ryhma__otsikko">' . esc_html($field_label) . ':</h3>';
+            $output .= '<div class="acf-info-ryhma__sisalto">';
+
+            if ($field_key === 'ilmoittautumisen_paattymispaiva' && !$has_value) {
+                $output .= 'Jatkuva ilmoittautuminen';
+            } else {
+                $output .= esc_html($value);
+            }
+
+            $output .= '</div></section>';
+        }
+    }
+
+    return $output;
+});
