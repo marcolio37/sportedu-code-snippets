@@ -1,0 +1,45 @@
+/**
+ * Shortcode [koulutusjarjestaja_nimi linkki="true|false"]
+ * Näyttää postauksen koulutusjärjestäjän nimen.
+ * Parametri linkki määrittää, lisätäänkö nimiin linkki järjestäjän sivulle (oletus 'false').
+ *
+ * @param array $atts Shortcode-attribuutit.
+ * @return string Näytettävä koulutusjärjestäjän nimi tai tyhjä merkkijono.
+ */
+add_shortcode('koulutusjarjestaja_nimi', function($atts) {
+    // Määritellään oletusattribuutit ja yhdistetään annettuihin
+    $atts = shortcode_atts([
+        'linkki' => 'false',
+    ], $atts, 'koulutusjarjestaja_nimi');
+
+    $post_id = get_the_ID();
+
+    if (!$post_id) {
+        return ''; // Ei kontekstia, palauta tyhjä
+    }
+
+    // Haetaan ACF-kentästä koulutusjärjestäjä, voi olla post-objekti tai ID
+    $kouluttaja = get_field('koulutusjarjestaja', $post_id);
+
+    if ($kouluttaja) {
+        // Jos objekti, haetaan ID, muuten oletetaan suora ID
+        $kouluttaja_id = is_object($kouluttaja) ? $kouluttaja->ID : $kouluttaja;
+
+        // Haetaan koulutusjärjestäjän nimi ja suojataan HTML:ltä
+        $nimi = esc_html(get_the_title($kouluttaja_id));
+
+        // Tarkistetaan linkin lisäys (kieliriippumaton, puhdistetaan merkit)
+        if (filter_var($atts['linkki'], FILTER_VALIDATE_BOOLEAN)) {
+            $url = esc_url(get_permalink($kouluttaja_id));
+            // Varmistetaan, että linkki ei ole tyhjä
+            if ($url) {
+                return '<a href="' . $url . '">' . $nimi . '</a>';
+            }
+        }
+
+        return $nimi;
+    }
+
+    // Jos koulutusjärjestäjää ei ole, palautetaan tyhjä merkkijono
+    return '';
+});
