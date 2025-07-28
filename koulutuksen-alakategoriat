@@ -1,0 +1,59 @@
+/**
+ * Shortcode [koulutus_kategoriat_ryhmittain]
+ * Näyttää koulutus-kategoriat ryhmiteltynä ennaltamääriteltyjen prefiksien mukaan.
+ *
+ * Etsii kyseisen postauksen koulutus-kategoriat ja ryhmittelee ne hyödyntäen
+ * termien slugien prefiksejä, esim. 'koulutusjarjestaja-xxxx', 'aihealue-xxxx' jne.
+ *
+ * @return string HTML esitys ryhmitellyistä kategorioista tai tyhjä merkkijono
+ */
+add_shortcode('koulutus_kategoriat_ryhmittain', function() {
+    // Määrittele prefiksit ja niiden otsikot
+    $parent_slugs = array(
+        'koulutusjarjestaja' => 'Koulutusjärjestäjä',
+        'aihealue'           => 'Aihealue',
+        'ajankohta'          => 'Ajankohta',
+        'koulutustapa'       => 'Koulutustapa',
+    );
+    
+    $taxonomy = 'koulutus-kategoria';
+    $post_id  = get_the_ID();
+    $output   = '';
+
+    // Hae postauksen termit taksonomiasta koulutus-kategoria
+    $terms = get_the_terms($post_id, $taxonomy);
+
+    // Jos ei termejä tai virhe, palauta tyhjä
+    if (empty($terms) || is_wp_error($terms)) {
+        return '';
+    }
+
+    // Käy läpi jokainen määritelty prefiksi
+    foreach ($parent_slugs as $parent_slug => $parent_label) {
+        $children = [];
+
+        // Suodata termit, joiden slug alkaa annetulla prefiksillä
+        foreach ($terms as $term) {
+            // Varmista, että slug on string ja vertaa alkua
+            if (!empty($term->slug) && strpos($term->slug, $parent_slug . '-') === 0) {
+                $children[] = $term;
+            }
+        }
+
+        // Jos löydettiin termejä tälle ryhmälle, luo ulos HTML
+        if (!empty($children)) {
+            $output .= '<section class="kategoria-ryhma">';
+            $output .= '<h3 class="kategoria-ryhma__otsikko">' . esc_html($parent_label) . ':</h3>';
+
+            // Kerää termien nimet listaksi
+            $names = array_map(function($t) {
+                return esc_html($t->name);
+            }, $children);
+
+            $output .= '<div class="kategoria-ryhma__sisalto">' . implode(', ', $names) . '</div>';
+            $output .= '</section>';
+        }
+    }
+
+    return $output;
+});
