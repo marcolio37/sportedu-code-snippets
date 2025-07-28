@@ -1,0 +1,14 @@
+/**
+ * Shortcode [koulutukset_count]
+ * Palauttaa julkaistujen 'koulutukset' -postauksien lukumäärän merkkijonona.
+ */
+add_shortcode('koulutukset_count', function() {
+    // Hae postityypin koulutukset julkaistujen lukumäärä
+    $counts = wp_count_posts('koulutukset');
+
+    // Varmistus, että $counts objekti on saatavilla ja sisältää 'publish'
+    $count = is_object($counts) && isset($counts->publish) ? intval($counts->publish) : 0;
+
+    // Palauta lukumäärä merkkijonona
+    return strval($count);
+});
