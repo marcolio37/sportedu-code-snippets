@@ -1,0 +1,46 @@
+/**
+ * Shortcode [koulutus_acf_tiedot]
+ * Näyttää koulutuksen tiedot: osoite, laajuus, osallistujamäärä ja hinta.
+ * Hinnan kohdalla näyttää erityisesti "Maksuton koulutus", jos kenttä on tyhjä.
+ *
+ * @return string HTML-muotoinen esitys koulutustiedoista.
+ */
+add_shortcode('koulutus_acf_tiedot', function() {
+    $post_id = get_the_ID();
+
+    // Määritellään haettavat kentät ja niiden näkyvät otsikot
+    $fields = [
+        'koulutuksen_osoite'           => 'Osoite',
+        'koulutuksen_laajuus'          => 'Laajuus',
+        'koulutuksen_osallistujamaara' => 'Osallistujamäärä',
+        'koulutuksen_hinta'            => 'Hinta',
+    ];
+
+    $output = '';
+
+    foreach ($fields as $field_key => $field_label) {
+        $value = get_field($field_key, $post_id);
+
+        // Tarkista, onko kentällä "arvo": isset ja merkkijonon pituus > 0 (esim. '0' hyväksytään arvoksi)
+        $has_value = isset($value) && strlen(trim((string)$value)) > 0;
+
+        // Mikäli kentällä on arvo TAI on hinta-kenttä, vaikka arvo puuttuu, näytetään osio
+        if ($has_value || ($field_key === 'koulutuksen_hinta' && !$has_value)) {
+            $output .= '<section class="acf-info-ryhma">';
+            $output .= '<h3 class="acf-info-ryhma__otsikko">' . esc_html($field_label) . ':</h3>';
+            $output .= '<div class="acf-info-ryhma__sisalto">';
+
+            // Hinnassa, jos ei ole arvoa, näytetään erikoisviesti
+            if ($field_key === 'koulutuksen_hinta' && !$has_value) {
+                $output .= 'Maksuton koulutus';
+            } else {
+                // Muuten näytetään kentän arvo turvallisesti
+                $output .= esc_html($value);
+            }
+
+            $output .= '</div></section>';
+        }
+    }
+
+    return $output;
+});
