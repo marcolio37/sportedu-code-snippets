@@ -1,0 +1,39 @@
+/**
+ * Shortcode [koulutus_paivat_ja_ilmo]
+ * Näyttää koulutuksen alkamis- ja päättymispäivät yhdessä rivissä sekä ilmoittautumisen päättymispäivän erillisessä osiossa.
+ * Jos ilmoittautumispäivä puuttuu, näyttää "Jatkuva ilmoittautuminen".
+ *
+ * @return string HTML-muotoinen päivätieto.
+ */
+add_shortcode('koulutus_paivat_ja_ilmo', function() {
+    $post_id = get_the_ID();
+
+    if (!$post_id) {
+        return ''; // Ei postauskontekstia, palataan tyhjä
+    }
+
+    // Haetaan ACF-kenttien arvot
+    $alku = get_field('koulutuksen_alkamispaiva', $post_id);
+    $loppu = get_field('koulutuksen_paattymispaiva', $post_id);
+    $ilmo = get_field('ilmoittautumisen_paattymispaiva', $post_id);
+
+    $output = '';
+
+    // Näytä alkamis- ja päättymispäivä, jos molemmat olemassa
+    if (!empty($alku) && !empty($loppu)) {
+        $output .= '<div class="koulutus-paivat-linja">';
+        $output .= esc_html($alku) . ' &ndash; ' . esc_html($loppu);
+        $output .= '</div>';
+    }
+
+    // Ilmoittautumisen päättymispäivä tai jatkuva ilmoittautuminen
+    $output .= '<div class="koulutus-ilmo-info">';
+    if (!empty($ilmo)) {
+        $output .= '(' . esc_html__('Ilmoittautuminen päättyy:', 'text-domain') . ' ' . esc_html($ilmo) . ')';
+    } else {
+        $output .= '(' . esc_html__('Jatkuva ilmoittautuminen', 'text-domain') . ')';
+    }
+    $output .= '</div>';
+
+    return $output;
+});
