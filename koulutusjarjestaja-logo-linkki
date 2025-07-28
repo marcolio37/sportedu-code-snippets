@@ -1,0 +1,62 @@
+/**
+ * Shortcode [kouluttaja_logo size="thumbnail|medium|large|full" alt="vaihtoehtoinen teksti" linkki="true|false"]
+ * Näyttää koulutusjärjestäjän logon halutulla kuvakoolla.
+ * Parametri 'linkki' määrittää, lisätäänkö kuvaan linkki järjestäjän sivulle (oletus 'false').
+ *
+ * @param array $atts Shortcode-attribuutit.
+ * @return string HTML-kuva (img) tai tyhjä merkkijono.
+ */
+add_shortcode('kouluttaja_logo', function($atts) {
+    // Määritellään shortcode-attribuuttien oletusarvot
+    $atts = shortcode_atts([
+        'size'   => 'medium',
+        'alt'    => '',      // vaihtoehtoinen alt-teksti, jos kentällä ei ole omaa
+        'linkki' => 'false',
+    ], $atts, 'kouluttaja_logo');
+
+    $post_id = get_the_ID();
+
+    if (!$post_id) {
+        return ''; // Ei saatavilla, palataan tyhjä
+    }
+
+    // Haetaan ACF-kentästä koulutusjärjestäjä, voi olla objekti tai pelkkä ID
+    $kouluttaja = get_field('koulutusjarjestaja', $post_id);
+
+    if (!$kouluttaja) {
+        return ''; // Ei koulutusjärjestäjää
+    }
+
+    $kouluttaja_id = is_object($kouluttaja) ? $kouluttaja->ID : $kouluttaja;
+
+    // Haetaan koulutusjärjestäjän logo (ACF image field)
+    $logo = get_field('logo', $kouluttaja_id);
+
+    if (!$logo || !is_array($logo)) {
+        return ''; // Logo ei löydy tai ei odotetussa muodossa
+    }
+
+    // Valitaan kuvan URL halutulla koolla. Jos määritelty koko ei löydy, käytetään perus-URL:ia.
+    $size = sanitize_key($atts['size']);
+    $image_url = isset($logo['sizes'][$size]) ? esc_url($logo['sizes'][$size]) : esc_url($logo['url']);
+
+    // Alt-teksti joko shortcode-attribuutista tai ACF-kuvakentästä
+    $alt_text = $atts['alt'];
+    if (empty($alt_text) && !empty($logo['alt'])) {
+        $alt_text = $logo['alt'];
+    }
+    $alt_text = esc_attr($alt_text);
+
+    // Luodaan kuvan HTML
+    $img = '<img src="' . $image_url . '" alt="' . $alt_text . '">';
+
+    // Jos linkkiasetus on 'true' (myös käsitellään boolean-tyyppisesti), lisätään linkki
+    if (filter_var($atts['linkki'], FILTER_VALIDATE_BOOLEAN)) {
+        $permalink = get_permalink($kouluttaja_id);
+        if ($permalink) {
+            $img = '<a href="' . esc_url($permalink) . '">' . $img . '</a>';
+        }
+    }
+
+    return $img;
+});
