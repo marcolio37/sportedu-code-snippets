@@ -1,0 +1,94 @@
+/**
+ * Shortcode [acf_linkkilista_swiper]
+ * Lisää Swiper-karusellin kuville linkit, jotka haetaan ACF:n gallerian kuvista ja niihin liittyvistä linkeistä.
+ *
+ * Tämä shortcode lisää sivulle JS-koodin, joka liittää karusellin kukin slide-elementtiin kattavan <a>-elementin, jos linkki on määritelty.
+ *
+ * Käyttö:
+ * - Olettaa, että sivulla on olemassa Swiper-karuselli, jossa linkit liitetään elementteihin .kuvakaruselli-linkit .swiper-slide
+ * - ACF-kenttä 'kouluttajakuvakaruselli' sisältää gallerian (kuvat) ja 
+ * - 'kouluttajakuvakaruselli_linkit' sisältää JSON-muotoisen mapin kuvien ID:stä linkkeihin.
+ *
+ * @return string JS-koodi, joka lisätään sivun loppuun.
+ */
+add_shortcode('acf_linkkilista_swiper', function() {
+    $post_id = get_the_ID();
+    if (!$post_id) {
+        return ''; // Ei kontekstia, ei tehdä mitään
+    }
+
+    // Haetaan ACF-galleria (kuvat voivat olla array-olioita tai pelkkiä ID:itä)
+    $gallery = get_field('kouluttajakuvakaruselli', $post_id);
+    // Haetaan JSON-linkit ja puretaan taulukoksi
+    $links_json = get_field('kouluttajakuvakaruselli_linkit', $post_id);
+    $links_array = $links_json ? json_decode($links_json, true) : [];
+
+    $ordered_links = [];
+
+    if (is_array($gallery) && is_array($links_array)) {
+        foreach ($gallery as $logo) {
+            $logo_id = null;
+
+            // Selvitä logo-ID riippuen tallennusmuodosta
+            if (is_array($logo)) {
+                if (!empty($logo['ID']) && is_numeric($logo['ID'])) {
+                    $logo_id = (int) $logo['ID'];
+                } elseif (is_numeric($logo)) {
+                    $logo_id = (int) $logo;
+                }
+            } elseif (is_numeric($logo)) {
+                $logo_id = (int) $logo;
+            }
+
+            // Jos linkki löytyy, lisätään sitä vastaava URL, muuten tyhjä merkintä
+            if ($logo_id !== null && isset($links_array[$logo_id])) {
+                $ordered_links[] = esc_url_raw($links_array[$logo_id]);
+            } else {
+                $ordered_links[] = '';
+            }
+        }
+    }
+
+    // Jos ei linkkejä, palauta tyhjä
+    if (empty($ordered_links)) {
+        return '';
+    }
+
+    ob_start();
+    ?>
+    <script type="text/javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        // Linkit karusellin slideille
+        var links = <?php echo wp_json_encode($ordered_links, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+
+        var slides = document.querySelectorAll('.kuvakaruselli-linkit .swiper-slide');
+
+        slides.forEach(function(slide, index) {
+            var href = links[index] || '';
+            if (href) {
+                // Luo kattava <a> elementti linkiksi slideen
+                var linkEl = document.createElement('a');
+                linkEl.href = href;
+                // Aseta tyylit, jotta <a> peittää koko slidin ja on klikattavissa
+                linkEl.style.position = 'absolute';
+                linkEl.style.top = '0';
+                linkEl.style.left = '0';
+                linkEl.style.width = '100%';
+                linkEl.style.height = '100%';
+                linkEl.style.zIndex = '10';
+                linkEl.setAttribute('aria-label', 'Linkki koulutusjärjestäjälle'); // Lisätty saavutettavuutta ajatellen
+
+                // Varmistaa, että slide-elementillä on position-relative, jotta absoluuttinen <a> toimii oikein
+                var slidePosition = window.getComputedStyle(slide).position;
+                if (slidePosition === 'static' || slidePosition === '') { 
+                    slide.style.position = 'relative';
+                }
+
+                slide.appendChild(linkEl);
+            }
+        });
+    });
+    </script>
+    <?php
+    return ob_get_clean();
+});
