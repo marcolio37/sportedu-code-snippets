@@ -1,0 +1,42 @@
+/**
+ * Muokkaa Yoast SEO:n murupolkua eri post typeille lisäämällä niille oma arkistolinkki.
+ *
+ * @param array $links Murupolun linkkitaulukko.
+ * @return array Muokattu linkkitaulukko.
+ */
+add_filter('wpseo_breadcrumb_links', function($links) {
+
+    /**
+     * Lisää mukautetun linkin murupolkuun indeksissä 1 (kotisivun jälkeen).
+     *
+     * @param array $links Murupolun linkkitaulukko.
+     * @param string $url Linkin URL.
+     * @param string $text Linkin näkyvä teksti.
+     * @return array Muokattu linkkitaulukko.
+     */
+    function add_breadcrumb_link(array $links, string $url, string $text): array {
+        $link = [
+            'url'  => esc_url($url),
+            'text' => sanitize_text_field($text),
+        ];
+        // Lisätään linkki sijalle 1 (= kotisivun jälkeen)
+        array_splice($links, 1, 0, [$link]);
+        return $links;
+    }
+
+    // Määrittele post typejen arkistopolut ja nimet assosiatiiviseen taulukkoon
+    $post_type_links = [
+        'post'         => ['url' => home_url('/blogi/'), 'text' => 'Blogi'],
+        'koulutukset'  => ['url' => home_url('/liikunta-alan-koulutukset/'), 'text' => 'Liikunta-alan koulutukset'],
+        'koulutuspolku'=> ['url' => home_url('/liikunta-alan-koulutuspolut/'), 'text' => 'Liikunta-alan koulutuspolut'],
+    ];
+
+    foreach ($post_type_links as $post_type => $info) {
+        if (is_singular($post_type)) {
+            $links = add_breadcrumb_link($links, $info['url'], $info['text']);
+            break; // Lisää linkki vain ensimmäiselle osuvalla post typelle
+        }
+    }
+
+    return $links;
+});
