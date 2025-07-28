@@ -1,0 +1,76 @@
+<?php
+/**
+ * Mukautetut rewrite-säännöt ja permalinkkien muokkaus koulutuspoluille ja koulutusjärjestäjille
+ */
+
+// Uudelleenkirjoitussäännöt
+function custom_rewrite_rules() {
+    // Koulutuspolkujen yksittäiset postit
+    add_rewrite_rule(
+        '^liikunta-alan-koulutuspolut/([^/]+)/?$',
+        'index.php?post_type=koulutuspolku&name=$matches[1]',
+        'top'
+    );
+
+    // Koulutuspolkujen kategoriat ja feedit (valinnainen)
+    add_rewrite_rule(
+        '^liikunta-alan-koulutuspolut/kategoria/([^/]+)/?$',
+        'index.php?koulutus-kategoria=$matches[1]',
+        'top'
+    );
+    add_rewrite_rule(
+        '^liikunta-alan-koulutuspolut/kategoria/([^/]+)/feed/?$',
+        'index.php?koulutus-kategoria=$matches[1]&feed=rss2',
+        'top'
+    );
+
+    // Koulutusjärjestäjien yksittäiset postit
+    add_rewrite_rule(
+        '^koulutusjarjestaja/([^/]+)/?$',
+        'index.php?post_type=koulutusjarjestaja&name=$matches[1]',
+        'top'
+    );
+}
+add_action('init', 'custom_rewrite_rules');
+
+// Koulutuspolkujen permalinkkien muokkaus
+function custom_koulutuspolku_post_type_link($post_link, $post) {
+    if ($post->post_type === 'koulutuspolku') {
+        return home_url('/liikunta-alan-koulutuspolut/' . $post->post_name . '/');
+    }
+    return $post_link;
+}
+add_filter('post_type_link', 'custom_koulutuspolku_post_type_link', 10, 2);
+
+// Koulutusjärjestäjien permalinkkien muokkaus
+function custom_koulutusjarjestaja_post_type_link($post_link, $post) {
+    if ($post->post_type === 'koulutusjarjestaja') {
+        return home_url('/koulutusjarjestaja/' . $post->post_name . '/');
+    }
+    return $post_link;
+}
+add_filter('post_type_link', 'custom_koulutusjarjestaja_post_type_link', 10, 2);
+
+// Taksonomian koulutus-kategoria permalinkin muokkaus (valinnainen)
+function custom_koulutuspolku_category_permalink($termlink, $term, $taxonomy) {
+    if ($taxonomy === 'koulutus-kategoria') {
+        return home_url('/liikunta-alan-koulutuspolut/kategoria/' . $term->slug . '/');
+    }
+    return $termlink;
+}
+add_filter('term_link', 'custom_koulutuspolku_category_permalink', 10, 3);
+
+// Lisää query_vars koulutus-kategoria-taksonomialle (valinnainen)
+function custom_koulutuspolku_query_vars($vars) {
+    $vars[] = 'koulutus-kategoria';
+    return $vars;
+}
+add_filter('query_vars', 'custom_koulutuspolku_query_vars');
+
+// Lisää feed-tuki koulutus-kategoria-taksonomialle (valinnainen)
+function custom_koulutuspolku_category_feed($query) {
+    if ($query->is_main_query() && $query->get('feed') && $query->get('koulutus-kategoria')) {
+        $query->set('post_type', 'koulutuspolku');
+    }
+}
+add_action('pre_get_posts', 'custom_koulutuspolku_category_feed');
