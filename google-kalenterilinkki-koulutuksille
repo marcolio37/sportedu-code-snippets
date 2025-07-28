@@ -1,0 +1,57 @@
+/**
+ * Lisää Google Calendar -ilmoittautumislinkki ACF-kenttään 'gcal_link' tallennettaessa koulutus-postaus.
+ */
+add_action('acf/save_post', function($post_id) {
+    // Tarkistetaan, että käsitellään oikeaa postityyppiä.
+    if (get_post_type($post_id) !== 'koulutukset') {
+        return;
+    }
+
+    // Haetaan ilmoittautumisen päättymispäivä ACF-kentästä.
+    $paiva = get_field('ilmoittautumisen_paattymispaiva', $post_id);
+    $paiva_gcal = '';
+
+    if ($paiva) {
+        $paiva_obj = DateTime::createFromFormat('d.m.Y', $paiva);
+        if ($paiva_obj) {
+            // Google Calendar -linkki käyttää YYYYMMDD-muotoa.
+            // Huom! Google Calendar 'dates' parametri odottaa YYYYMMDD format with ISO8601 time,
+            // mutta päivämäärän ollessa pelkkä päivä, tämä toimii ainakin
+            $paiva_gcal = $paiva_obj->format('Ymd');
+        }
+    }
+
+    // Otsikko haetaan postauksesta, fallback "Koulutus"
+    $otsikko = get_the_title($post_id) ?: 'Koulutus';
+
+    // Järjestäjän nimi haetaan ACF-kentästä (voi olla post-objekti tai muu)
+    $jarjestaja = get_field('koulutusjarjestaja', $post_id);
+    if (is_object($jarjestaja) && isset($jarjestaja->post_title)) {
+        $jarjestaja = $jarjestaja->post_title;
+    }
+    $jarjestaja = $jarjestaja ?: 'Koulutuksen järjestäjä';
+
+    // Linkki koulutuksen sivulle
+    $koulutus_url = get_permalink($post_id) ?: home_url();
+
+    // Kalenterin 'details' kenttä. Kannattaa rajoittaa merkkimäärä Google Calenderin rajoitusten vuoksi.
+    $details = "Lue lisää: " . $koulutus_url;
+
+    // Rakennetaan Google Calendar -linkki
+    $gcal_link = "https://calendar.google.com/calendar/render?action=TEMPLATE"
+        . "&text=" . urlencode("Ilmoittaudu: " . $otsikko)
+        . "&details=" . urlencode($details)
+        . "&location=" . urlencode($jarjestaja);
+
+    // Lisää päivämäärä ilmoittautumisen päättymispäivälle, jos se on asetettu
+    if ($paiva_gcal) {
+        // Huom: Google Calendar odottaa myös alkamis- ja päättymishetkeä kellon aikoineen.
+        // Tämä linkki on kuitenkin silti toimiva pelkällä päivämäärillä.
+        // Voit halutessasi päivittää formatin myös sisältämään kellonajat esimerkiksi 'T000000Z'
+        $gcal_link .= "&dates={$paiva_gcal}/{$paiva_gcal}";
+    }
+
+    // Päivitä ACF-kenttä 'gcal_link' postauksessa
+    update_field('gcal_link', $gcal_link, $post_id);
+
+}, 20);
