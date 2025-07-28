@@ -1,0 +1,61 @@
+// 🔁 Aikataulutetaan päivittäinen cron-jobi koulutusten päivitykselle
+add_action('wp', 'koulutusvahti_aikataulu');
+
+function koulutusvahti_aikataulu() {
+    // Tarkistetaan, onko ajastettu tehtävä jo tulossa
+    if (!wp_next_scheduled('koulutusvahti_cron')) {
+        // Asetetaan ensin nyt alkava ja päivittäin toistuva cron-task
+        wp_schedule_event(time(), 'daily', 'koulutusvahti_cron');
+    }
+}
+
+// 🔔 Cron-hook, joka suorittaa tarkistuksen
+add_action('koulutusvahti_cron', 'koulutusvahti_tarkista_ja_paivita');
+
+function koulutusvahti_tarkista_ja_paivita() {
+    // Hae kaikki julkaistut koulutukset (post_type 'koulutukset')
+    $koulutukset = get_posts(array(
+        'post_type'      => 'koulutukset',
+        'post_status'    => 'publish',
+        'posts_per_page' => -1,
+        'fields'         => 'ids', // Saadaan vain post_ID:t, tehokkaampaa muistinkäytön kannalta
+    ));
+
+    if (empty($koulutukset)) {
+        return; // Ei koulutuksia, lopetetaan
+    }
+
+    $tanaan_ymd = current_time('Ymd');
+
+    foreach ($koulutukset as $post_id) {
+        // Hae ilmoittautumisen päättymispäivä (ACF-kenttä tai meta)
+        if (function_exists('get_field')) {
+            $paattymispaiva = get_field('ilmoittautumisen_paattymispaiva', $post_id);
+        } else {
+            $paattymispaiva = get_post_meta($post_id, 'ilmoittautumisen_paattymispaiva', true);
+        }
+
+        if (empty($paattymispaiva)) {
+            continue; // Ei päivämäärää, siirrytään seuraavaan
+        }
+
+        // Muutetaan päivä ‘d.m.Y’ -> DateTime objekti
+        $paattymispaiva_obj = DateTime::createFromFormat('d.m.Y', $paattymispaiva);
+        if (!$paattymispaiva_obj) {
+            // Päiväyksen muoto väärä, ohitetaan
+            continue;
+        }
+
+        // Muutetaan vertailukelpoinen muoto YYYYMMDD
+        $paattymispaiva_ymd = $paattymispaiva_obj->format('Ymd');
+
+        // Jos päättymispäivä on ennen tänään (= mennyttä aikaa)
+        if ($paattymispaiva_ymd < $tanaan_ymd) {
+            // Vaihdetaan postaus tilaan 'draft' (luonnos)
+            wp_update_post(array(
+                'ID' => $post_id,
+                'post_status' => 'draft',
+            ));
+        }
+    }
+}
