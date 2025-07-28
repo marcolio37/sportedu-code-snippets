@@ -1,0 +1,29 @@
+/**
+ * Lisää sarake "Ilmoittautumisen päättymispäivä" koulutukset CPT:n admin-listaukseen.
+ *
+ * @param array $columns Nykyiset sarakkeet.
+ * @return array Muokatut sarakkeet.
+ */
+add_filter('manage_koulutukset_posts_columns', function($columns) {
+    // Lisää sarake nykyisten sarakkeiden loppuun
+    $columns['ilmoittautumisen_paattymispaiva'] = __('Ilmoittautumisen päättymispäivä', 'text-domain');
+    return $columns;
+});
+
+/**
+ * Täyttää custom sarakkeen arvolla ACF-kentästä "ilmoittautumisen_paattymispaiva".
+ *
+ * @param string $column Sarakkeen tunniste.
+ * @param int $post_id Postauksen ID.
+ */
+add_action('manage_koulutukset_posts_custom_column', function($column, $post_id) {
+    if ($column === 'ilmoittautumisen_paattymispaiva') {
+        $value = get_field('ilmoittautumisen_paattymispaiva', $post_id);
+
+        if ($value) {
+            echo esc_html($value);
+        } else {
+            echo '—'; // Tyhjän tilan esitys
+        }
+    }
+}, 10, 2);
