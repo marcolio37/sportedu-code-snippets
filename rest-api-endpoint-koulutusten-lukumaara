@@ -1,0 +1,54 @@
+add_action('rest_api_init', function() {
+    register_rest_route('sportedu/v1', '/koulutus-counts', array(
+        'methods'  => 'GET',
+        'callback' => function($request) {
+            // Hae parametrina annettu "slugs", pilkuilla erotettu lista
+            $slugs_param = $request->get_param('slugs');
+            
+            if (empty($slugs_param)) {
+                return new WP_Error('missing_param', 'Parametri "slugs" puuttuu tai on tyhjä.', array('status' => 400));
+            }
+
+            $slugs = array_map('sanitize_text_field', explode(',', $slugs_param));
+            $counts = array();
+
+            foreach ($slugs as $slug) {
+                // Hae taksonomia-termi slugilla koulutus-kategoria-taksonomiasta
+                $term = get_term_by('slug', $slug, 'koulutus-kategoria');
+
+                if (!$term || is_wp_error($term)) {
+                    // Termiä ei löytynyt — vastaa nollalla
+                    $counts[$slug] = 0;
+                    continue;
+                }
+
+                // WP_Query koulutukset post_type, julkaistut, taksonomialla rajoitettuna
+                $args = array(
+                    'post_type'      => 'koulutukset', 
+                    'post_status'    => 'publish',
+                    'tax_query'      => array(
+                        array(
+                            'taxonomy' => 'koulutus-kategoria',
+                            'field'    => 'slug',
+                            'terms'    => $slug,
+                        ),
+                    ),
+                    'fields'         => 'ids',
+                    'posts_per_page' => -1, // Hae kaikki, jotta löydetään täsmällinen lukumäärä
+                    'no_found_rows'  => false, // Halutaan total count
+                    'cache_results'  => false, // Voit harkita true jos haluat välimuistia
+                );
+
+                $query = new WP_Query($args);
+                $counts[$slug] = $query->found_posts;
+            }
+
+            return rest_ensure_response($counts);
+        },
+
+        // Optio: määrittele lupa-tarkistus, esim. public-lukuoikeus
+        'permission_callback' => function() {
+            return true; // Julkinen endpoint, vai muuta tarvittaessa
+        }
+    ));
+});
