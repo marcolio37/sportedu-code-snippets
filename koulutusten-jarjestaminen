@@ -1,0 +1,27 @@
+/**
+ * Mukautettu Elementor query -filtteri, joka järjestää koulutukset alkamisajan mukaan.
+ *
+ * @param WP_Query $query Query-objekti, joka on muokattavana.
+ */
+function query_koulutuksen_alkamispaiva( $query ) {
+    // Varmistetaan, että muokkaamme pääkyselyä, ei esim. adminin kyselyjä tms.
+    if ( is_admin() || ! $query instanceof WP_Query ) {
+        return;
+    }
+
+    // Aseta järjestämiskriteeriksi meta-arvo (koulutuksen_alkamispaiva)
+    $query->set( 'orderby', 'meta_value' );
+
+    // Määritellään meta-avain (custom field), jonka mukaan järjestetään
+    $query->set( 'meta_key', 'koulutuksen_alkamispaiva' );
+
+    // Voit halutessasi määrittää järjestyksen (ASC / DESC), esim. vanhimmasta uusimpaan
+    $query->set( 'order', 'ASC' );
+
+    // Kommentoitua debug-tulostusta voi käyttää kehityksessä
+    /*
+    echo '<pre style="background:#f0f0f0; padding:10px; border:1px solid #ccc;">' 
+         . print_r( $query->query_vars, true ) . '</pre>';
+    */
+}
+add_action( 'elementor/query/query_koulutuksen_alkamispaiva', 'query_koulutuksen_alkamispaiva' );
