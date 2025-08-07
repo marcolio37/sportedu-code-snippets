@@ -3,6 +3,9 @@
  * Näyttää koulutusjärjestäjän logon halutulla kuvakoolla.
  * Parametri 'linkki' määrittää, lisätäänkö kuvaan linkki järjestäjän sivulle (oletus 'false').
  *
+ * Alt-tekstiksi muodostetaan "[koulutusjärjestäjä] -logo", jos koulutusjärjestäjän nimi saadaan,
+ * muuten käytetään shortcode-attribuutissa annettua alt-tekstiä tai ACF-kuvakentän alt-tekstiä.
+ *
  * @param array $atts Shortcode-attribuutit.
  * @return string HTML-kuva (img) tai tyhjä merkkijono.
  */
@@ -10,47 +13,56 @@ add_shortcode('kouluttaja_logo', function($atts) {
     // Määritellään shortcode-attribuuttien oletusarvot
     $atts = shortcode_atts([
         'size'   => 'medium',
-        'alt'    => '',      // vaihtoehtoinen alt-teksti, jos kentällä ei ole omaa
-        'linkki' => 'false',
+        'alt'    => '',      // vaihtoehtoinen alt-teksti
+        'linkki' => 'false', // lisätäänkö linkki
     ], $atts, 'kouluttaja_logo');
 
     $post_id = get_the_ID();
-
     if (!$post_id) {
-        return ''; // Ei saatavilla, palataan tyhjä
+        return ''; // Ei postauskontekstia, ei tuoteta mitään
     }
 
-    // Haetaan ACF-kentästä koulutusjärjestäjä, voi olla objekti tai pelkkä ID
+    // Haetaan koulutusjärjestäjä (voi olla objekti tai ID)
     $kouluttaja = get_field('koulutusjarjestaja', $post_id);
-
     if (!$kouluttaja) {
-        return ''; // Ei koulutusjärjestäjää
+        return ''; // Ei löydy koulutusjärjestäjää
     }
 
     $kouluttaja_id = is_object($kouluttaja) ? $kouluttaja->ID : $kouluttaja;
 
-    // Haetaan koulutusjärjestäjän logo (ACF image field)
+    // Haetaan logo ACF-kuvakentästä
     $logo = get_field('logo', $kouluttaja_id);
-
     if (!$logo || !is_array($logo)) {
         return ''; // Logo ei löydy tai ei odotetussa muodossa
     }
 
-    // Valitaan kuvan URL halutulla koolla. Jos määritelty koko ei löydy, käytetään perus-URL:ia.
+    // Haetaan haluttu kuvakoko, jos sitä ei löydy, käytetään alkuperäistä URL:ia
     $size = sanitize_key($atts['size']);
     $image_url = isset($logo['sizes'][$size]) ? esc_url($logo['sizes'][$size]) : esc_url($logo['url']);
 
-    // Alt-teksti joko shortcode-attribuutista tai ACF-kuvakentästä
-    $alt_text = $atts['alt'];
-    if (empty($alt_text) && !empty($logo['alt'])) {
-        $alt_text = $logo['alt'];
+    // Haetaan koulutusjärjestäjän nimi (postin title)
+    $koulutusjarjestaja_nimi = '';
+    if (is_object($kouluttaja) && !empty($kouluttaja->post_title)) {
+        $koulutusjarjestaja_nimi = $kouluttaja->post_title;
+    } elseif (is_numeric($kouluttaja)) {
+        $koulutusjarjestaja_nimi = get_the_title($kouluttaja);
+    }
+
+    // Muodostetaan alt-teksti: prioriteetti nimelle, sitten shortcode-attribuutille, lopuksi kuvan omalle alt-tekstille
+    if (!empty($koulutusjarjestaja_nimi)) {
+        $alt_text = $koulutusjarjestaja_nimi . ' -logo';
+    } else {
+        $alt_text = $atts['alt'];
+        if (empty($alt_text) && !empty($logo['alt'])) {
+            $alt_text = $logo['alt'];
+        }
     }
     $alt_text = esc_attr($alt_text);
 
     // Luodaan kuvan HTML
     $img = '<img src="' . $image_url . '" alt="' . $alt_text . '">';
 
-    // Jos linkkiasetus on 'true' (myös käsitellään boolean-tyyppisesti), lisätään linkki
+    // Jos linkki attribuutti on true, lisätään kuvaan linkki koulutusjärjestäjän sivulle
     if (filter_var($atts['linkki'], FILTER_VALIDATE_BOOLEAN)) {
         $permalink = get_permalink($kouluttaja_id);
         if ($permalink) {
