@@ -1,0 +1,58 @@
+function lisaa_noopener_noreferrer_ulkoinen_linkkiin($content) {
+    // Käytetään DOMDocumentia, joka käsittelee HTML:n turvallisesti
+    if (empty($content)) {
+        return $content;
+    }
+
+    // Muodostetaan DOM-olio
+    libxml_use_internal_errors(true);
+    $dom = new DOMDocument();
+    $dom->loadHTML(mb_convert_encoding($content, 'HTML-ENTITIES', 'UTF-8'));
+
+    // Hae kaikki <a>-elementit
+    $links = $dom->getElementsByTagName('a');
+
+    foreach ($links as $link) {
+        $href = $link->getAttribute('href');
+
+        // Tarkistetaan että href löytyy ja on ulkoinen linkki (alkaa http tai https, eikä domain ole sivustosi domain)
+        if ($href && (strpos($href, 'http://') === 0 || strpos($href, 'https://') === 0)) {
+            // Verrataan oman sivuston domainiin
+            $site_url = parse_url(site_url(), PHP_URL_HOST);
+            $link_host = parse_url($href, PHP_URL_HOST);
+
+            // Jos linkki vie ulos omalta domainilta, lisätään rel-attr
+            if ($link_host && strtolower($link_host) !== strtolower($site_url)) {
+                // Nykyinen rel-arvo
+                $rel = $link->getAttribute('rel');
+
+                // Listä noopener noreferrer, jos niitä ei ole vielä
+                $add_rels = [];
+                if (stripos($rel, 'noopener') === false) {
+                    $add_rels[] = 'noopener';
+                }
+                if (stripos($rel, 'noreferrer') === false) {
+                    $add_rels[] = 'noreferrer';
+                }
+
+                if (!empty($add_rels)) {
+                    // Lisää uudet arvot olemassa olevaan rel-attribuuttiin
+                    $new_rel = trim($rel . ' ' . implode(' ', $add_rels));
+                    $link->setAttribute('rel', $new_rel);
+                }
+            }
+        }
+    }
+
+    // Palautetaan muokattu sisältö ilman <html> ja <body> tageja
+    $body = $dom->getElementsByTagName('body')->item(0);
+    $new_content = '';
+    foreach ($body->childNodes as $child) {
+        $new_content .= $dom->saveHTML($child);
+    }
+
+    return $new_content;
+}
+
+// Käytetään suodattimena WordPressin contentille, esim. single-post sisällössä
+add_filter('the_content', 'lisaa_noopener_noreferrer_ulkoinen_linkkiin');
