@@ -1,7 +1,13 @@
-add_action('template_redirect', function() {
-    // Tarkistetaan onko kyse kategoria-, tagi- tai muu taksonomiasivu
+// Lisää noindex, nofollow meta-tagit taksonomiasivuille hakukoneille
+add_action('wp_head', function() {
     if (is_category() || is_tag() || is_tax()) {
-        // Ohjataan käyttäjä kotisivulle nopealla 301-uudelleenohjauksella
+        echo '<meta name="robots" content="noindex, nofollow" />' . "\n";
+    }
+});
+
+// Uudelleenohjaa taksonomiasivut kotisivulle (301 Redirect)
+add_action('template_redirect', function() {
+    if (is_category() || is_tag() || is_tax()) {
         wp_redirect(home_url(), 301);
         exit;
     }
